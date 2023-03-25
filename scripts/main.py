@@ -1,7 +1,6 @@
 import os, sys
 
 project_dir = f"{os.path.dirname(os.path.abspath(__file__))}/.."
-print(os.listdir(project_dir))
 sys.path.append(project_dir)
 
 from src import Pricer, UniformSampler, PolynomialAndTrigonometricModel
