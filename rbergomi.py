@@ -112,15 +112,24 @@ def price_single_call_option_given_paths(dt, paths, strike_price, maturity):
 
 
 @partial(jit, static_argnums=(0, 1, 2, 3))
-def price(m, s, n, dt, t, S0, a, rho, eta, xi, strike_price, maturity):
+def price(m, s, n, dt, t, S0, a, rho, eta, xi, strike_price, maturity, multipliers):
     paths = simulate_paths(m, s, n, dt, t, S0, a, rho, eta, xi)
-    return price_single_call_option_given_paths(dt, paths, strike_price, maturity)
+    return price_single_call_option_given_paths(dt, paths, strike_price, maturity) * multipliers
 
 
 def price_and_grad_batch(m, s, n, dt, t, S0, a, rho, eta, xi, strike_prices, maturities):
     # cross strike prices and maturities
     strikes_new = jnp.repeat(strike_prices, maturities.shape[0], axis=None)
     maturities_new = jnp.tile(maturities, strike_prices.shape[0])
+
+    paths = simulate_paths(m, s, n, dt, t, S0, a, rho, eta, xi)
+    #jac_paths = jax.jacfwd(simulate_paths, argnums=(6, 7, 8, 9))(m, s, n, dt, t, S0, a, rho, eta, xi)
+    #res = jax.vmap(price_single_call_option_given_paths, in_axes=(None, None, 0, 0))(dt, paths, strikes_new, maturities_new)
+
+    jacobian = jax.jacfwd(
+        price,
+        argnums=(6, 7, 8, 9, 10, 11, 12)
+    )(m, s, n, dt, t, S0, a, rho, eta, xi, 1., 1., jnp.array([1., 2.]))
 
     y, dy_dx = jax.vmap(
         jax.value_and_grad(
@@ -136,6 +145,7 @@ def price_and_grad_batch(m, s, n, dt, t, S0, a, rho, eta, xi, strike_prices, mat
     return x, y, dy_dx
 
 
+@partial(jit, static_argnums=(0, 1, 2, 3))
 def simulate_paths(m, s, n, dt, t, S0, a, rho, eta, xi):
     e = jnp.array([0, 0])
     c = cov(a, n)

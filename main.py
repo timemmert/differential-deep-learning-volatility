@@ -35,7 +35,7 @@ t = jnp.linspace(0, T, 1 + s)[jnp.newaxis, :]  # Time grid
 strikes = jnp.array([1.])
 maturities = jnp.array([0.5, 1])
 
-
+price_and_grad_batch(m, s, n, dt, t, S0, a[0], rho[0], eta[0], xi[0], strikes, maturities)
 x, y, dy_dx = jax.vmap(
     price_and_grad_batch,
     in_axes=(None, None, None, None, None, None, 0, 0, 0, 0, None, None)
