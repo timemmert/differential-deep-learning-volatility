@@ -1,43 +1,43 @@
-# WOndering what is happening here? https://github.com/ryanmccrickerd/rough_bergomi/blob/master/notebooks/rbergomi.ipynb
-import jax
-import numpy as np
-from jax import grad, value_and_grad
-from matplotlib import pyplot as plt
+import jax.random
 
 import jax.numpy as jnp
-from rbergomi import simulate
+from rbergomi import price_and_grad_batch
 
 T = 1.0
 n = 100
 m = 30000
 S0 = 1.
+initial_key = jax.random.PRNGKey(0)
+key_a, key_xi, key_rho, key_eta = jax.random.split(initial_key, 4)
 
-a = -0.43
-xi = 0.235 ** 2
-rho = -0.9
-eta = 1.9
+n_samples = 10
+
+minval_a = -0.5
+maxval_a = 0.5
+a = jax.random.uniform(key_a, (n_samples,), minval=minval_a, maxval=maxval_a)
+
+minval_xi = 0.2 ** 2
+maxval_xi = 0.5 ** 2
+xi = jax.random.uniform(key_xi, (n_samples,), minval=minval_xi, maxval=maxval_xi)
+
+minval_rho = -0.9
+maxval_rho = -0.1
+rho = jax.random.uniform(key_rho, (n_samples,), minval=minval_rho, maxval=maxval_rho)
+
+minval_eta = 0.5
+maxval_eta = 4
+eta = jax.random.uniform(key_rho, (n_samples,), minval=minval_eta, maxval=maxval_eta)
 
 dt = 1.0 / n
 s = int(n * T)  # Steps
-t = jnp.linspace(0, T, 1 + s)[np.newaxis, :]  # Time grid
+t = jnp.linspace(0, T, 1 + s)[jnp.newaxis, :]  # Time grid
 
-# Construct hybrid scheme correlation structure for kappa = 1
+strikes = jnp.array([1.])
+maturities = jnp.array([0.5, 1])
 
-K = 1.3
 
-val_grad_sim = value_and_grad(simulate, argnums=(5, 6, 7, 8, 9, 10))
-
-for i in range(10000):
-    S, gradient = val_grad_sim(m, s, n, dt, t, K, S0, a, rho, eta, xi)
-    print(i)
-"""paths_plot = 10
-plot, axes = plt.subplots()
-axes.plot(t[0, :], np.mean(S, axis=0), 'r')
-axes.plot(t[0, :], np.ones_like(t[0, :]), 'g')
-
-if paths_plot > 0:
-    axes.plot(t[0, :], np.transpose(S[:paths_plot, :]), lw=0.5)
-axes.set_xlabel(r'$t$', fontsize=16)
-axes.set_ylabel(r'$S_t$', fontsize=16)
-plt.grid(True)
-plt.show()"""
+x, y, dy_dx = jax.vmap(
+    price_and_grad_batch,
+    in_axes=(None, None, None, None, None, None, 0, 0, 0, 0, None, None)
+)(m, s, n, dt, t, S0, a, rho, eta, xi, strikes, maturities)
+print("Done")

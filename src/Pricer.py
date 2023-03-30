@@ -6,7 +6,12 @@ from src import Path, Model, Sampler
 class Pricer:
     """Class for generation of training data using model, parameters samples, and option."""
 
-    def __init__(self, model: Model, parameters_sampler: Sampler, option=None):
+    def __init__(
+        self,
+        model: Model,
+        parameters_sampler: Sampler,
+        option=None
+    ):
         """Constructor.
 
         Args:

@@ -1,3 +1,4 @@
+# WOndering what is happening here? https://github.com/ryanmccrickerd/rough_bergomi/blob/master/notebooks/rbergomi.ipynb
 from functools import partial
 
 import jax
@@ -104,8 +105,38 @@ def S1(dt, V, dW1, rho, S0=1):
     return S
 
 
+def price_single_call_option_given_paths(dt, paths, strike_price, maturity):
+    maturity_index = (maturity / dt).astype(int)
+    res = jnp.greater(paths[:, maturity_index], strike_price) * paths[:, maturity_index]
+    return 1 / paths.shape[0] * res.sum(axis=0)
+
+
 @partial(jit, static_argnums=(0, 1, 2, 3))
-def simulate(m, s, n, dt, t, K, S0, a, rho, eta, xi):
+def price(m, s, n, dt, t, S0, a, rho, eta, xi, strike_price, maturity):
+    paths = simulate_paths(m, s, n, dt, t, S0, a, rho, eta, xi)
+    return price_single_call_option_given_paths(dt, paths, strike_price, maturity)
+
+
+def price_and_grad_batch(m, s, n, dt, t, S0, a, rho, eta, xi, strike_prices, maturities):
+    # cross strike prices and maturities
+    strikes_new = jnp.repeat(strike_prices, maturities.shape[0], axis=None)
+    maturities_new = jnp.tile(maturities, strike_prices.shape[0])
+
+    y, dy_dx = jax.vmap(
+        jax.value_and_grad(
+            price,
+            argnums=(6, 7, 8, 9, 10, 11)
+        ),
+        in_axes=(None, None, None, None, None, None, None, None, None, None, 0, 0),
+        out_axes=(0, 0)
+    )(m, s, n, dt, t, S0, a, rho, eta, xi, strikes_new, maturities_new)
+    # x is an array of all inputs that vmap took
+    x_constants = jnp.array([[a, rho, eta, xi]] * strikes_new.shape[0])
+    x = jnp.concatenate((x_constants, jnp.expand_dims(strikes_new, 1), jnp.expand_dims(maturities_new, 1)), axis=1)
+    return x, y, dy_dx
+
+
+def simulate_paths(m, s, n, dt, t, S0, a, rho, eta, xi):
     e = jnp.array([0, 0])
     c = cov(a, n)
 
@@ -116,7 +147,4 @@ def simulate(m, s, n, dt, t, K, S0, a, rho, eta, xi):
     dB = compute_dB(dW1=dW1, dW2=dW2, rho=rho)
     V = compute_V(a=a, t=t, Y=Y, xi=xi, eta=eta)
     S = compute_S(m=m, dt=dt, V=V, dB=dB, S0=S0)
-
-    res = (S[:, -1] > K) * S[:, -1]
-
-    return 1/m * res.sum()
+    return S
